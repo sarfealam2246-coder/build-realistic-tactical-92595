@@ -1,0 +1,41 @@
+name: Build Godot 4 Mobile Vulkan APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+permissions:
+  contents: write
+jobs:
+  export-android:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Export Templates & Keystore
+        run: |
+          mkdir -p "$HOME/.local/share/godot" "$HOME/.config/godot" build/android
+          if [ -d /root/.local/share/godot ]; then cp -rn /root/.local/share/godot/* "$HOME/.local/share/godot/" || true; fi
+          if [ -d /root/.config/godot ]; then cp -rn /root/.config/godot/* "$HOME/.config/godot/" || true; fi
+          JAVA_DIR="${JAVA_HOME:-$(dirname $(dirname $(readlink -f $(which java))))}"
+          ANDROID_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}}"
+          KS_PATH="$HOME/.local/share/godot/debug.keystore"
+          if [ ! -f "$KS_PATH" ]; then
+            keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore "$KS_PATH" -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999
+          fi
+          echo '[gd_resource type="EditorSettings" format=3]' > "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo '[resource]' >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo "export/android/java_sdk_path = \"$JAVA_DIR\"" >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo "export/android/android_sdk_path = \"$ANDROID_DIR\"" >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo "export/android/debug_keystore = \"$KS_PATH\"" >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo 'export/android/debug_keystore_user = "androiddebugkey"' >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          echo 'export/android/debug_keystore_pass = "android"' >> "$HOME/.config/godot/editor_settings-4.3.tres"
+          godot --headless --quit --editor || true
+      - name: Export Android APK
+        run: godot --headless --export-release "Android" build/android/game-release.apk
+      - name: Publish APK Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-${{ github.run_number }}
+          name: "Godot 4 3D Android APK"
+          files: build/android/*.apk

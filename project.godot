@@ -1,0 +1,8 @@
+config_version=5
+
+[application]
+config/name="Build Realistic Tactical"
+run/main_scene="res://scenes/main.tscn"
+[rendering]
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

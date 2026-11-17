@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060913; color:#e2e8f0; font-family:system-ui,sans-serif; overflow:hidden; height:430px; }
+  #bar { position:absolute; top:8px; left:8px; right:8px; z-index:20; display:flex; flex-wrap:wrap; gap:6px; background:rgba(10,15,30,0.78); backdrop-filter:blur(10px); padding:8px; border-radius:12px; border:1px solid rgba(56,189,248,0.3); }
+  .st-pill { font-size:11px; padding:4px 8px; border-radius:999px; background:rgba(255,255,255,0.06); color:#94a3b8; }
+  .st-pill.done { background:rgba(16,185,129,0.22); color:#34d399; border:1px solid rgba(16,185,129,0.45); }
+  .st-pill.active { background:rgba(56,189,248,0.25); color:#38bdf8; border:1px solid #38bdf8; box-shadow:0 0 10px rgba(56,189,248,0.4); }
+  #hud { position:absolute; bottom:12px; left:12px; right:12px; z-index:20; display:flex; justify-content:space-between; align-items:flex-end; pointer-events:none; }
+  .joy { width:78px; height:78px; border-radius:50%; border:2px solid rgba(56,189,248,0.6); background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; font-size:11px; color:#38bdf8; pointer-events:auto; }
+  .btns { display:flex; gap:8px; pointer-events:auto; }
+  .btn-act { padding:10px 14px; border-radius:10px; border:none; font-weight:700; color:#fff; cursor:pointer; }
+  .btn-gas { background:linear-gradient(135deg,#10b981,#059669); }
+  .btn-brk { background:linear-gradient(135deg,#ef4444,#b91c1c); }
+  #title-badge { position:absolute; top:58px; left:12px; z-index:15; font-size:12px; background:rgba(15,23,42,0.7); padding:4px 10px; border-radius:8px; border:1px solid rgba(168,85,247,0.4); color:#e9d5ff; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="bar"><div class="st-pill done">1. Sky & HDRI Lighting</div><div class="st-pill done">2. Terrain & Buildings</div><div class="st-pill done">3. 3D Vehicle/Character GLB</div><div class="st-pill active">4. Physics & Touch HUD</div><div class="st-pill wait">5. Playwright Vision QA</div><div class="st-pill wait">6. Native APK Ready</div></div>
+<div id="title-badge">3D Live Assembly (3d_shooter): Build a realistic 3D Tactical Survival Shooter game for Android APK with Mobile </div>
+<div id="hud">
+  <div class="joy" id="steerBtn">STEER</div>
+  <div class="btns">
+    <button class="btn-act btn-brk" id="brkBtn">BRK</button>
+    <button class="btn-act btn-gas" id="gasBtn">ACTION / GAS</button>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x111827, 0.008);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / 430, 0.1, 600);
+camera.position.set(10, 6.5, 14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, 430);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.8;
+
+const sky = new Sky();
+sky.scale.setScalar(4500);
+scene.add(sky);
+const sun = new THREE.Vector3();
+const phi = THREE.MathUtils.degToRad(90 - 18);
+const theta = THREE.MathUtils.degToRad(140);
+sun.setFromSphericalCoords(1, phi, theta);
+sky.material.uniforms['sunPosition'].value.copy(sun);
+sky.material.uniforms['turbidity'].value = 6;
+sky.material.uniforms['rayleigh'].value = 2;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(sky).texture;
+
+const dirLight = new THREE.DirectionalLight(0xfff4e0, 2.4);
+dirLight.position.set(20, 35, 18);
+dirLight.castShadow = true;
+scene.add(dirLight);
+scene.add(new THREE.HemisphereLight(0x87ceeb, 0x334155, 0.8));
+
+const texLoader = new THREE.TextureLoader();
+const terrainTex = texLoader.load('https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/rocky_terrain_02/rocky_terrain_02_diff_1k.jpg');
+terrainTex.wrapS = terrainTex.wrapT = THREE.RepeatWrapping;
+terrainTex.repeat.set(18, 18);
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(180, 180),
+  new THREE.MeshStandardMaterial({ map: terrainTex, roughness: 0.9 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const roadTex = texLoader.load('https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_diff_1k.jpg');
+roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
+roadTex.repeat.set(1, 20);
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 180),
+  new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.7 })
+);
+road.rotation.x = -Math.PI / 2;
+road.position.y = 0.02;
+road.receiveShadow = true;
+scene.add(road);
+
+if (true) {
+  const bMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.2 });
+  for (let i = -3; i <= 3; i++) {
+    if (i === 0) continue;
+    const h = 4 + Math.abs(i) * 2.2;
+    const b1 = new THREE.Mesh(new THREE.BoxGeometry(5, h, 5), bMat);
+    b1.position.set(-14, h / 2, i * 16);
+    b1.castShadow = true;
+    scene.add(b1);
+    const b2 = new THREE.Mesh(new THREE.BoxGeometry(5, h + 1.5, 5), bMat);
+    b2.position.set(14, (h + 1.5) / 2, i * 16);
+    b2.castShadow = true;
+    scene.add(b2);
+  }
+}
+
+let heroGroup = new THREE.Group();
+scene.add(heroGroup);
+if (true) {
+  const gltfLoader = new GLTFLoader();
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+  gltfLoader.setDRACOLoader(draco);
+  gltfLoader.load('https://raw.githubusercontent.com/PlayableIntelligence/game-creator/53676bd2a524989745ce7cbd4128c17e8a20dd3d/examples/3d-asset-test/public/assets/models/Soldier.glb', (gltf) => {
+    const m = gltf.scene;
+    const box = new THREE.Box3().setFromObject(m);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const s = 4.2 / maxDim;
+    m.scale.setScalar(s);
+    const b2 = new THREE.Box3().setFromObject(m);
+    m.position.y -= b2.min.y;
+    m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+    heroGroup.add(m);
+  }, undefined, () => {
+    const fallback = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 1.8, 5.2),
+      new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.5 })
+    );
+    fallback.position.y = 1.0;
+    heroGroup.add(fallback);
+  });
+}
+
+let speed = 0;
+document.getElementById('gasBtn')?.addEventListener('click', () => { speed = 0.15; controls.autoRotate = false; });
+document.getElementById('brkBtn')?.addEventListener('click', () => { speed = 0; });
+
+function animate() {
+  requestAnimationFrame(animate);
+  if (speed > 0) heroGroup.position.z -= speed;
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
